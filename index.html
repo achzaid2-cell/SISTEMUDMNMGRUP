@@ -34,23 +34,13 @@
 </head>
 <body>
 
-  <!-- Iframe Utama Aplikasi Google Apps Script -->
+  <!-- Iframe Utama Aplikasi Google Apps Script (Tanpa Tombol Melayang yang Mengganggu Menu Lain) -->
   <iframe
     id="gas-iframe"
     src="about:blank"
     allow="camera *; microphone *; geolocation *; fullscreen *; clipboard-read *; clipboard-write *"
     allowfullscreen>
   </iframe>
-
-  <!-- Floating Button Cepat Buka Kamera Live -->
-  <button
-    type="button"
-    id="fab-live-cam"
-    onclick="openTopLiveScanner()"
-    class="fixed bottom-4 right-4 z-30 bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2.5 rounded-full shadow-xl border-2 border-white/30 text-xs font-extrabold flex items-center gap-2 transition">
-    <i class="fa-solid fa-barcode text-sm"></i>
-    <span>Kamera Live WMS</span>
-  </button>
 
   <!-- Setup URL Modal (Hanya muncul jika GAS_EXEC_URL belum diisi di kode) -->
   <div id="setup-url-modal" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-xs flex items-center justify-center p-4">
@@ -75,61 +65,61 @@
     </div>
   </div>
 
-  <!-- MODAL KAMERA LIVE TOP-LEVEL VERCEL -->
-  <div id="top-live-camera-modal" class="hidden fixed inset-0 z-40 bg-slate-950/85 backdrop-blur-xs flex flex-col justify-between p-3 sm:p-5 overflow-y-auto">
+  <!-- MODAL KAMERA LIVE TOP-LEVEL VERCEL (Hanya Terbuka Saat Dipanggil dari Menu WMS) -->
+  <div id="top-live-camera-modal" class="hidden fixed inset-0 z-40 bg-slate-950/85 backdrop-blur-xs flex flex-col justify-center p-2.5 sm:p-5 overflow-y-auto">
     <div class="max-w-lg w-full mx-auto bg-slate-900 text-white rounded-2xl border border-slate-700 shadow-2xl overflow-hidden my-auto relative">
-      <!-- Top Bar -->
-      <div class="px-4 py-3 bg-gradient-to-r from-blue-950 to-slate-900 border-b border-slate-800 flex items-center justify-between gap-2">
-        <div class="flex items-center gap-2">
-          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
-          <div>
-            <h3 class="text-xs sm:text-sm font-extrabold">Kamera Live WMS — UD. MNM GRUP</h3>
-            <p id="top-cam-status-txt" class="text-[10px] text-blue-200">Triple-Engine Scanner &amp; Suara Aktif</p>
+      <!-- Top Bar Proporsional -->
+      <div class="px-3.5 py-2.5 bg-gradient-to-r from-blue-950 to-slate-900 border-b border-slate-800 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0"></span>
+          <div class="min-w-0">
+            <h3 class="text-xs sm:text-sm font-extrabold truncate">Kamera Live WMS — UD. MNM GRUP</h3>
+            <p id="top-cam-status-txt" class="text-[10px] text-blue-200 truncate">Triple-Engine Scanner &amp; Suara Aktif</p>
           </div>
         </div>
-        <div class="flex items-center gap-1.5">
-          <button type="button" id="top-btn-torch" onclick="toggleTopTorch()" class="hidden px-2.5 py-1.5 rounded-lg bg-amber-400 text-slate-950 text-[11px] font-extrabold">
+        <div class="flex items-center gap-1 shrink-0">
+          <button type="button" id="top-btn-torch" onclick="toggleTopTorch()" class="hidden px-2 py-1.5 rounded-lg bg-amber-400 text-slate-950 text-[10px] font-extrabold">
             <i class="fa-solid fa-bolt"></i> Senter
           </button>
-          <button type="button" onclick="switchTopCameraFacing()" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 text-[11px] font-bold">
+          <button type="button" onclick="switchTopCameraFacing()" class="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 text-[10px] font-bold">
             <i class="fa-solid fa-camera-rotate"></i> Putar
           </button>
-          <button type="button" onclick="closeTopLiveScanner()" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-extrabold">
+          <button type="button" onclick="closeTopLiveScanner()" class="px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-extrabold">
             <i class="fa-solid fa-xmark mr-1"></i>Tutup
           </button>
         </div>
       </div>
 
       <!-- Mode & Lens Selector Bar -->
-      <div class="px-4 py-2.5 bg-slate-800/80 border-b border-slate-700/80 grid grid-cols-2 gap-2 text-xs">
-        <div>
-          <label class="block text-[10px] font-bold text-slate-400 mb-0.5">Alur Scan Gudang</label>
+      <div class="px-3.5 py-2 bg-slate-800/80 border-b border-slate-700/80 grid grid-cols-2 gap-2 text-xs">
+        <div class="min-w-0">
+          <label class="block text-[10px] font-bold text-slate-400 mb-0.5 truncate">Alur Scan Gudang</label>
           <select id="top-mode-scan" onchange="syncModeToIframe()" class="w-full bg-slate-900 text-white border border-slate-600 rounded-lg px-2 py-1.5 text-[11px] font-bold">
-            <option value="1X">⚡ 1 Kali Scan (Langsung)</option>
-            <option value="2X_PACKING">📦 2x Scan: Tahap 1 Packing</option>
-            <option value="2X_KURIR">🚚 2x Scan: Tahap 2 Kurir</option>
+            <option value="1X">⚡ 1x Scan (Langsung)</option>
+            <option value="2X_PACKING">📦 2x: Tahap 1 Packing</option>
+            <option value="2X_KURIR">🚚 2x: Tahap 2 Kurir</option>
             <option value="RETUR">↩️ Scan Retur / RTS</option>
           </select>
         </div>
-        <div>
-          <label class="block text-[10px] font-bold text-slate-400 mb-0.5">Pilih Lensa Kamera HP</label>
+        <div class="min-w-0">
+          <label class="block text-[10px] font-bold text-slate-400 mb-0.5 truncate">Pilih Lensa Kamera HP</label>
           <select id="top-lens-select" onchange="changeTopCameraLens(this.value)" class="w-full bg-slate-900 text-white border border-slate-600 rounded-lg px-2 py-1.5 text-[11px] font-bold">
-            <option value="environment">📷 Kamera Belakang Utama</option>
+            <option value="environment">📷 Kamera Belakang</option>
             <option value="user">🤳 Kamera Depan</option>
           </select>
         </div>
       </div>
 
       <!-- BANNER NOTIFIKASI DI ATAS TAMPILAN KAMERA PEMINDAI (KHUSUS PAKET DOUBLE / RESI GANDA, BATAL & LOLOS SCAN) -->
-      <div id="top-above-camera-banner" class="hidden p-3.5 border-b-2 transition-all duration-150"></div>
+      <div id="top-above-camera-banner" class="hidden p-3 border-b-2 transition-all duration-150"></div>
 
       <!-- Live Video Viewport -->
-      <div class="relative w-full aspect-[4/3] bg-black flex items-center justify-center overflow-hidden">
+      <div class="relative w-full aspect-[4/3] max-h-[52vh] bg-black flex items-center justify-center overflow-hidden">
         <video id="top-live-video" playsinline autoplay muted class="w-full h-full object-cover"></video>
 
         <!-- Laser Target Box -->
         <div class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <div id="top-aim-box" class="w-4/5 h-28 border-2 border-emerald-400 rounded-2xl relative shadow-[0_0_30px_rgba(16,185,129,0.35)] transition-colors duration-150">
+          <div id="top-aim-box" class="w-4/5 h-24 sm:h-28 border-2 border-emerald-400 rounded-2xl relative shadow-[0_0_30px_rgba(16,185,129,0.35)] transition-colors duration-150">
             <div class="absolute inset-x-3 top-1/2 h-0.5 bg-rose-500 shadow-[0_0_10px_#f43f5e] animate-pulse"></div>
           </div>
           <span id="top-aim-hint" class="mt-2 px-3 py-0.5 rounded-full bg-black/75 text-emerald-300 text-[10px] font-bold tracking-wide">
@@ -138,35 +128,35 @@
         </div>
 
         <!-- MODAL NOTIFIKASI WAJIB KLIK OK SETELAH 1 BARCODE TERSCAN -->
-        <div id="top-scan-confirm-modal" class="hidden absolute inset-0 z-30 bg-slate-950/90 backdrop-blur-xs flex items-center justify-center p-4">
-          <div id="top-confirm-box" class="w-full max-w-sm rounded-2xl p-4 sm:p-5 shadow-2xl border-2 border-emerald-400 bg-slate-900 text-white text-center space-y-3">
-            <div id="top-confirm-icon" class="w-12 h-12 rounded-full mx-auto flex items-center justify-center text-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-400/40">
+        <div id="top-scan-confirm-modal" class="hidden absolute inset-0 z-30 bg-slate-950/90 backdrop-blur-xs flex items-center justify-center p-3">
+          <div id="top-confirm-box" class="w-full max-w-sm rounded-2xl p-3.5 sm:p-5 shadow-2xl border-2 border-emerald-400 bg-slate-900 text-white text-center space-y-2.5">
+            <div id="top-confirm-icon" class="w-10 h-10 sm:w-12 sm:h-12 rounded-full mx-auto flex items-center justify-center text-xl sm:text-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-400/40">
               <i class="fa-solid fa-circle-check"></i>
             </div>
             <div>
               <span id="top-confirm-badge" class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-500 text-slate-950">
                 BARCODE TERBACA
               </span>
-              <h4 id="top-confirm-title" class="text-sm sm:text-base font-black text-white mt-1.5">
+              <h4 id="top-confirm-title" class="text-xs sm:text-base font-black text-white mt-1">
                 LOLOS SCAN
               </h4>
               <p id="top-confirm-sub" class="text-[11px] text-slate-300 mt-0.5">
                 Paket berhasil diverifikasi.
               </p>
             </div>
-            <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-3 text-left text-xs space-y-1">
-              <div><span class="text-slate-400 text-[10px] uppercase font-bold">Nomor Resi:</span> <b id="top-confirm-resi" class="font-mono text-emerald-300 text-sm block">-</b></div>
-              <div><span class="text-slate-400 text-[10px] uppercase font-bold">Toko &amp; Kurir:</span> <span id="top-confirm-kurir" class="font-semibold text-white">-</span></div>
-              <div><span class="text-slate-400 text-[10px] uppercase font-bold">Produk:</span> <span id="top-confirm-produk" class="font-semibold text-white">-</span></div>
+            <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-2.5 text-left text-[11px] space-y-1">
+              <div><span class="text-slate-400 text-[9px] uppercase font-bold">Nomor Resi:</span> <b id="top-confirm-resi" class="font-mono text-emerald-300 text-xs sm:text-sm block break-all">-</b></div>
+              <div><span class="text-slate-400 text-[9px] uppercase font-bold">Toko &amp; Kurir:</span> <span id="top-confirm-kurir" class="font-semibold text-white">-</span></div>
+              <div><span class="text-slate-400 text-[9px] uppercase font-bold">Produk:</span> <span id="top-confirm-produk" class="font-semibold text-white break-words">-</span></div>
             </div>
-            <p class="text-[11px] text-amber-300 font-semibold leading-snug">
-              ⏸️ Kamera dijeda otomatis agar tidak ter-scan 2 kali. Singkirkan paket lalu klik <b>OK</b> di bawah.
+            <p class="text-[10px] sm:text-[11px] text-amber-300 font-semibold leading-snug">
+              ⏸️ Kamera dijeda otomatis agar tidak ter-scan 2 kali. Singkirkan paket lalu klik <b>OK</b>.
             </p>
             <button
               type="button"
               id="top-btn-confirm-ok"
               onclick="confirmTopScanAndResume()"
-              class="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-sm shadow-lg transition">
+              class="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-sm shadow-lg transition">
               OK, Lanjut Scan Berikutnya
             </button>
           </div>
@@ -174,23 +164,23 @@
       </div>
 
       <!-- Instant Result Banner inside Live Camera Modal -->
-      <div id="top-scan-result-card" class="p-4 bg-slate-800 border-t border-slate-700 transition-colors duration-150">
+      <div id="top-scan-result-card" class="p-3.5 bg-slate-800 border-t border-slate-700 transition-colors duration-150">
         <div class="flex items-center justify-between gap-2">
-          <span id="top-res-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-slate-700 text-slate-300">
+          <span id="top-res-badge" class="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-slate-700 text-slate-300">
             MENUNGGU BARCODE RESI
           </span>
           <span id="top-res-count" class="text-[11px] font-bold text-emerald-400">0 Paket Terscan</span>
         </div>
-        <div id="top-res-title" class="text-base sm:text-lg font-black text-white mt-1">
+        <div id="top-res-title" class="text-sm sm:text-base font-black text-white mt-1">
           Dekatkan Barcode Resi ke Kamera
         </div>
-        <div id="top-res-sub" class="text-xs text-slate-300 mt-0.5">
+        <div id="top-res-sub" class="text-[11px] text-slate-300 mt-0.5">
           Setiap 1 barcode ter-scan, kamera otomatis berhenti &amp; menunggu Anda klik OK.
         </div>
-        <div id="top-res-meta" class="hidden mt-2.5 pt-2.5 border-t border-white/15 grid grid-cols-2 gap-2 text-[11px]">
-          <div><span class="opacity-70 block text-[9px] uppercase font-bold">No. Resi</span><b id="top-res-resi" class="font-mono">-</b></div>
-          <div><span class="opacity-70 block text-[9px] uppercase font-bold">Toko &amp; Kurir</span><b id="top-res-kurir">-</b></div>
-          <div class="col-span-2"><span class="opacity-70 block text-[9px] uppercase font-bold">Isi Produk / SKU</span><b id="top-res-produk">-</b></div>
+        <div id="top-res-meta" class="hidden mt-2 pt-2 border-t border-white/15 grid grid-cols-2 gap-2 text-[11px]">
+          <div class="min-w-0"><span class="opacity-70 block text-[9px] uppercase font-bold">No. Resi</span><b id="top-res-resi" class="font-mono break-all">-</b></div>
+          <div class="min-w-0"><span class="opacity-70 block text-[9px] uppercase font-bold">Toko &amp; Kurir</span><b id="top-res-kurir" class="truncate block">-</b></div>
+          <div class="col-span-2 min-w-0"><span class="opacity-70 block text-[9px] uppercase font-bold">Isi Produk / SKU</span><b id="top-res-produk" class="break-words">-</b></div>
         </div>
       </div>
     </div>
@@ -200,7 +190,7 @@
     // =========================================================================
     // 1. MASUKKAN URL WEB APP GOOGLE APPS SCRIPT (/exec) ANDA DI BARIS INI:
     // =========================================================================
-    const GAS_EXEC_URL = "https://script.google.com/macros/s/AKfycbwRkPa6di-3U17Re2xx-ClDHc4GB5z0rP3IVosDDFmy1CLlKlkeQNe64tN4IT24r-sF/exec";
+    const GAS_EXEC_URL = "https://script.google.com/macros/s/AKfycby_aal31gVsmhQwBEf0no81Sd4yD1l8a-C3YAXpoUzLvyKBJ_wD5M8-uNPHgninLml0/exec";
 
     const STORAGE_URL_KEY = "UD_MNM_VERCEL_GAS_URL_V1";
     let activeStream = null;
@@ -344,6 +334,11 @@
         sendToGasIframe({ type: "MNM_WMS_TOP_CAMERA_READY" });
       } else if (d.type === "MNM_WMS_SYNC_ORDERS_MAP") {
         if (d.ordersMap) topOrdersMap = d.ordersMap;
+      } else if (d.type === "MNM_ACTIVE_PAGE") {
+        // Jika pengguna berpindah ke menu selain WMS, pastikan modal kamera tertutup rapi
+        if (d.page && d.page !== "wms-gudang" && isScanning) {
+          closeTopLiveScanner();
+        }
       } else if (d.type === "MNM_WMS_START_TOP_CAMERA") {
         sendToGasIframe({ type: "MNM_WMS_TOP_CAMERA_READY" });
         if (d.facingMode) currentFacing = d.facingMode;
@@ -449,7 +444,7 @@
         const cams = devices.filter(d => d.kind === "videoinput");
         const sel = document.getElementById("top-lens-select");
         if (!sel || !cams.length) return;
-        let opts = '<option value="environment">📷 Kamera Belakang Utama</option><option value="user">🤳 Kamera Depan</option>';
+        let opts = '<option value="environment">📷 Kamera Belakang</option><option value="user">🤳 Kamera Depan</option>';
         cams.forEach((c, i) => {
           if (c.deviceId) {
             opts += `<option value="dev:${c.deviceId}">🔍 ${c.label || ("Lensa #" + (i + 1))}</option>`;
@@ -606,50 +601,50 @@
       if (!above) return;
 
       if (d.tipe === "GANDA" || d.tipe === "BATAL") {
-        above.className = "p-3.5 bg-rose-600 text-white border-b-4 border-amber-300 shadow-2xl transition-all duration-150";
+        above.className = "p-3 bg-rose-600 text-white border-b-4 border-amber-300 shadow-2xl transition-all duration-150";
         above.innerHTML = `
-          <div class="flex items-start gap-3">
-            <div class="w-10 h-10 rounded-xl bg-amber-300 text-rose-950 flex items-center justify-center text-xl font-black shrink-0">
+          <div class="flex items-start gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-amber-300 text-rose-950 flex items-center justify-center text-lg font-black shrink-0">
               <i class="fa-solid fa-triangle-exclamation"></i>
             </div>
             <div class="flex-1 min-w-0">
-              <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-300 text-rose-950">
+              <span class="inline-block px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-amber-300 text-rose-950">
                 ${d.tipe === "BATAL" ? "⛔ PAKET DIBATALKAN PEMBELI!" : "🚨 PERINGATAN PAKET DOUBLE / RESI GANDA!"}
               </span>
-              <div class="text-xs sm:text-sm font-black text-white mt-1">${escHtml(d.judul || "STOP! RESI GANDA!")}</div>
-              <div class="text-[11px] font-mono font-bold text-amber-200 mt-0.5">No. Resi: ${escHtml(d.resi || "-")} • ${escHtml(d.kurir || "-")}</div>
-              <div class="text-[11px] font-semibold text-white">Produk: ${escHtml(d.produk || "-")}</div>
-              <div class="text-[11px] font-bold text-rose-100 mt-1 bg-rose-900/70 rounded-lg px-2.5 py-1.5 border border-rose-400/40">${escHtml(d.subjudul || "-")}</div>
+              <div class="text-xs sm:text-sm font-black text-white mt-0.5">${escHtml(d.judul || "STOP! RESI GANDA!")}</div>
+              <div class="text-[11px] font-mono font-bold text-amber-200 break-all">No. Resi: ${escHtml(d.resi || "-")} • ${escHtml(d.kurir || "-")}</div>
+              <div class="text-[11px] font-semibold text-white truncate">Produk: ${escHtml(d.produk || "-")}</div>
+              <div class="text-[10px] font-bold text-rose-100 mt-1 bg-rose-900/70 rounded-lg px-2 py-1 border border-rose-400/40">${escHtml(d.subjudul || "-")}</div>
             </div>
-            <button type="button" onclick="confirmTopScanAndResume()" class="shrink-0 px-3 py-2 rounded-xl bg-amber-300 hover:bg-amber-200 text-rose-950 font-black text-[11px] shadow-md">
+            <button type="button" onclick="confirmTopScanAndResume()" class="shrink-0 px-2.5 py-2 rounded-xl bg-amber-300 hover:bg-amber-200 text-rose-950 font-black text-[11px] shadow-md">
               OK, Lanjut
             </button>
           </div>`;
         above.classList.remove("hidden");
       } else if (d.tipe === "WARN") {
-        above.className = "p-3.5 bg-amber-500 text-slate-950 border-b-2 border-amber-300 shadow-lg transition-all duration-150";
+        above.className = "p-3 bg-amber-500 text-slate-950 border-b-2 border-amber-300 shadow-lg transition-all duration-150";
         above.innerHTML = `
           <div class="flex items-center justify-between gap-2">
-            <div>
-              <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-slate-900 text-amber-300">⚠️ PERHATIAN GUDANG</span>
-              <div class="text-xs sm:text-sm font-black mt-0.5">${escHtml(d.judul || "-")} (${escHtml(d.resi || "-")})</div>
-              <div class="text-[11px] font-bold">${escHtml(d.subjudul || "-")}</div>
+            <div class="min-w-0">
+              <span class="inline-block px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-slate-900 text-amber-300">⚠️ PERHATIAN GUDANG</span>
+              <div class="text-xs font-black mt-0.5 truncate">${escHtml(d.judul || "-")} (${escHtml(d.resi || "-")})</div>
+              <div class="text-[11px] font-bold truncate">${escHtml(d.subjudul || "-")}</div>
             </div>
-            <button type="button" onclick="confirmTopScanAndResume()" class="shrink-0 px-3 py-2 rounded-xl bg-slate-900 text-amber-300 font-black text-[11px] shadow-md">
+            <button type="button" onclick="confirmTopScanAndResume()" class="shrink-0 px-2.5 py-2 rounded-xl bg-slate-900 text-amber-300 font-black text-[11px] shadow-md">
               OK, Lanjut
             </button>
           </div>`;
         above.classList.remove("hidden");
       } else {
-        above.className = "p-3 bg-emerald-600 text-white border-b-2 border-emerald-400 shadow-lg transition-all duration-150";
+        above.className = "p-2.5 bg-emerald-600 text-white border-b-2 border-emerald-400 shadow-lg transition-all duration-150";
         above.innerHTML = `
           <div class="flex items-center justify-between gap-2">
             <div class="min-w-0">
-              <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-white text-emerald-900">✓ LOLOS SCAN • ${escHtml(d.jam || "VALID")}</span>
-              <div class="text-xs sm:text-sm font-black truncate mt-0.5">${escHtml(d.resi || "-")} • ${escHtml(d.produk || "Paket")}</div>
-              <div class="text-[11px] text-emerald-100 truncate">${escHtml(d.kurir || "-")}</div>
+              <span class="inline-block px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-white text-emerald-900">✓ LOLOS SCAN • ${escHtml(d.jam || "VALID")}</span>
+              <div class="text-xs font-black truncate mt-0.5">${escHtml(d.resi || "-")} • ${escHtml(d.produk || "Paket")}</div>
+              <div class="text-[10px] text-emerald-100 truncate">${escHtml(d.kurir || "-")}</div>
             </div>
-            <button type="button" onclick="confirmTopScanAndResume()" class="shrink-0 px-3 py-2 rounded-xl bg-white text-emerald-900 font-black text-[11px] shadow-md">
+            <button type="button" onclick="confirmTopScanAndResume()" class="shrink-0 px-2.5 py-2 rounded-xl bg-white text-emerald-900 font-black text-[11px] shadow-md">
               OK, Lanjut
             </button>
           </div>`;
@@ -673,7 +668,6 @@
       }
       document.getElementById("top-cam-status-txt").innerText = "⏸️ Kamera Dijeda — Klik OK untuk Scan Berikutnya";
 
-      // Deteksi instan (0ms) apakah resi ini sudah pernah di-scan (Paket Double) atau Batal
       const modeVal = document.getElementById("top-mode-scan") ? document.getElementById("top-mode-scan").value : "1X";
       const existingOrd = topOrdersMap[code];
       let isInstantBatal = false;
@@ -739,7 +733,6 @@
         };
         updateAboveCameraBanner(initOk);
         showTopConfirmModal(initOk);
-        // Tandai di memori lokal agar jika di-scan ke-2 kalinya langsung terdeteksi Paket Double
         topOrdersMap[code] = Object.assign({}, existingOrd || { r: code, pr: "Paket Reguler", qty: 1 }, {
           st: modeVal === "2X_PACKING" ? "SUDAH_PACKING" : (modeVal === "RETUR" ? "RETUR" : "SELESAI_KIRIM"),
           u: jamNow
@@ -766,28 +759,28 @@
       sub.innerText = d.subjudul || "-";
 
       if (d.tipe === "GANDA" || d.tipe === "BATAL") {
-        box.className = "w-full max-w-sm rounded-2xl p-4 sm:p-5 shadow-2xl border-4 border-amber-300 bg-rose-950 text-white text-center space-y-3";
-        icon.className = "w-12 h-12 rounded-full mx-auto flex items-center justify-center text-2xl bg-rose-500/30 text-amber-300 border border-amber-300";
+        box.className = "w-full max-w-sm rounded-2xl p-3.5 sm:p-5 shadow-2xl border-4 border-amber-300 bg-rose-950 text-white text-center space-y-2.5";
+        icon.className = "w-10 h-10 sm:w-12 sm:h-12 rounded-full mx-auto flex items-center justify-center text-xl sm:text-2xl bg-rose-500/30 text-amber-300 border border-amber-300";
         icon.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
         badge.className = "inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-300 text-rose-950";
         badge.innerText = d.tipe === "BATAL" ? "⛔ PAKET DIBATALKAN" : "🚨 PAKET DOUBLE / RESI GANDA";
-        btnOk.className = "w-full py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-rose-950 font-black text-xs sm:text-sm shadow-lg transition";
+        btnOk.className = "w-full py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-rose-950 font-black text-xs sm:text-sm shadow-lg transition";
         btnOk.innerText = "OK, Mengerti & Pisahkan Paket!";
       } else if (d.tipe === "WARN") {
-        box.className = "w-full max-w-sm rounded-2xl p-4 sm:p-5 shadow-2xl border-2 border-amber-400 bg-slate-900 text-white text-center space-y-3";
-        icon.className = "w-12 h-12 rounded-full mx-auto flex items-center justify-center text-2xl bg-amber-500/20 text-amber-300 border border-amber-400";
+        box.className = "w-full max-w-sm rounded-2xl p-3.5 sm:p-5 shadow-2xl border-2 border-amber-400 bg-slate-900 text-white text-center space-y-2.5";
+        icon.className = "w-10 h-10 sm:w-12 sm:h-12 rounded-full mx-auto flex items-center justify-center text-xl sm:text-2xl bg-amber-500/20 text-amber-300 border border-amber-400";
         icon.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i>';
         badge.className = "inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-400 text-slate-950";
         badge.innerText = "⚠️ PERHATIAN GUDANG";
-        btnOk.className = "w-full py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm shadow-lg transition";
+        btnOk.className = "w-full py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm shadow-lg transition";
         btnOk.innerText = "OK, Mengerti & Lanjut Scan";
       } else {
-        box.className = "w-full max-w-sm rounded-2xl p-4 sm:p-5 shadow-2xl border-2 border-emerald-400 bg-slate-900 text-white text-center space-y-3";
-        icon.className = "w-12 h-12 rounded-full mx-auto flex items-center justify-center text-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-400/40";
+        box.className = "w-full max-w-sm rounded-2xl p-3.5 sm:p-5 shadow-2xl border-2 border-emerald-400 bg-slate-900 text-white text-center space-y-2.5";
+        icon.className = "w-10 h-10 sm:w-12 sm:h-12 rounded-full mx-auto flex items-center justify-center text-xl sm:text-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-400/40";
         icon.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
         badge.className = "inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-400 text-slate-950";
         badge.innerText = "✓ LOLOS SCAN • " + (d.jam || "VALID");
-        btnOk.className = "w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-sm shadow-lg transition";
+        btnOk.className = "w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-sm shadow-lg transition";
         btnOk.innerText = "OK, Lanjut Scan Berikutnya";
       }
 
@@ -810,7 +803,6 @@
         sendToGasIframe({ type: "MNM_WMS_CONFIRM_OK" });
       }
 
-      // Beri jeda 350ms setelah klik OK sebelum kamera mulai memindai barcode berikutnya
       setTimeout(() => {
         isScanPausedForOk = false;
       }, 350);
@@ -829,20 +821,20 @@
       showTopConfirmModal(d);
 
       if (d.tipe === "SUKSES") {
-        card.className = "p-4 bg-emerald-600 text-white border-t border-emerald-400 transition-colors duration-150";
-        badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-white text-emerald-900";
+        card.className = "p-3.5 bg-emerald-600 text-white border-t border-emerald-400 transition-colors duration-150";
+        badge.className = "px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-white text-emerald-900";
         badge.innerText = "✓ LOLOS SCAN • " + (d.jam || "");
-        aim.className = "w-4/5 h-28 border-4 border-emerald-400 rounded-2xl relative shadow-[0_0_35px_rgba(16,185,129,0.7)]";
+        aim.className = "w-4/5 h-24 sm:h-28 border-4 border-emerald-400 rounded-2xl relative shadow-[0_0_35px_rgba(16,185,129,0.7)]";
       } else if (d.tipe === "GANDA" || d.tipe === "BATAL") {
         playTopSound("ALARM");
-        card.className = "p-4 bg-rose-600 text-white border-t-4 border-amber-300 transition-colors duration-150";
-        badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-300 text-rose-950";
+        card.className = "p-3.5 bg-rose-600 text-white border-t-4 border-amber-300 transition-colors duration-150";
+        badge.className = "px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-300 text-rose-950";
         badge.innerText = (d.tipe === "BATAL" ? "⛔ PAKET BATAL" : "🚨 PAKET DOUBLE / RESI GANDA") + " • " + (d.jam || "");
-        aim.className = "w-4/5 h-28 border-4 border-rose-500 rounded-2xl relative shadow-[0_0_35px_rgba(244,63,94,0.8)]";
+        aim.className = "w-4/5 h-24 sm:h-28 border-4 border-rose-500 rounded-2xl relative shadow-[0_0_35px_rgba(244,63,94,0.8)]";
       } else {
         playTopSound("ALARM");
-        card.className = "p-4 bg-amber-500 text-slate-950 border-t border-amber-300 transition-colors duration-150";
-        badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-slate-900 text-amber-300";
+        card.className = "p-3.5 bg-amber-500 text-slate-950 border-t border-amber-300 transition-colors duration-150";
+        badge.className = "px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-slate-900 text-amber-300";
         badge.innerText = "⚠️ PERHATIAN • " + (d.jam || "");
       }
 
