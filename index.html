@@ -190,7 +190,7 @@
     // =========================================================================
     // 1. MASUKKAN URL WEB APP GOOGLE APPS SCRIPT (/exec) ANDA DI BARIS INI:
     // =========================================================================
-    const GAS_EXEC_URL = "https://script.google.com/macros/s/AKfycbyzwQ7JKk-Tgtb8X4Ssjp-vZg-FG5uCcI6dkIfaoqEx3WbUOiPUrcDP8GNhXERNpn59/exec";
+    const GAS_EXEC_URL = "https://script.google.com/macros/s/AKfycbzIo6LTExKXpsMOaAfyOu6cH4qBA72yl2mfsv8pX-sDxCpBcj9JGIQzbb1s4pHnrIRe/exec";
 
     const STORAGE_URL_KEY = "UD_MNM_VERCEL_GAS_URL_V1";
     let activeStream = null;
@@ -207,6 +207,7 @@
     let wavAlarmUri = "";
     let zxingTopReader = null;
     let topOrdersMap = {};
+    let topWajibResiTerdaftar = true;
 
     function escHtml(s) {
       return String(s === null || s === undefined ? "" : s)
@@ -328,6 +329,9 @@
 
       if (d.ordersMap && typeof d.ordersMap === "object") {
         topOrdersMap = d.ordersMap;
+      }
+      if (d.wajibResiTerdaftar !== undefined) {
+        topWajibResiTerdaftar = !!d.wajibResiTerdaftar;
       }
 
       if (d.type === "MNM_BRIDGE_HANDSHAKE") {
@@ -600,7 +604,10 @@
       const above = document.getElementById("top-above-camera-banner");
       if (!above) return;
 
-      if (d.tipe === "GANDA" || d.tipe === "BATAL") {
+      if (d.tipe === "GANDA" || d.tipe === "BATAL" || d.tipe === "TAK_TERDAFTAR") {
+        const badgeAtas = d.tipe === "BATAL"
+          ? "⛔ PAKET DIBATALKAN PEMBELI!"
+          : (d.tipe === "TAK_TERDAFTAR" ? "🚫 DITOLAK! RESI TIDAK ADA DI DAFTAR UPLOAD!" : "🚨 PERINGATAN PAKET DOUBLE / RESI GANDA!");
         above.className = "p-3 bg-rose-600 text-white border-b-4 border-amber-300 shadow-2xl transition-all duration-150";
         above.innerHTML = `
           <div class="flex items-start gap-2.5">
@@ -609,7 +616,7 @@
             </div>
             <div class="flex-1 min-w-0">
               <span class="inline-block px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-amber-300 text-rose-950">
-                ${d.tipe === "BATAL" ? "⛔ PAKET DIBATALKAN PEMBELI!" : "🚨 PERINGATAN PAKET DOUBLE / RESI GANDA!"}
+                ${badgeAtas}
               </span>
               <div class="text-xs sm:text-sm font-black text-white mt-0.5">${escHtml(d.judul || "STOP! RESI GANDA!")}</div>
               <div class="text-[11px] font-mono font-bold text-amber-200 break-all">No. Resi: ${escHtml(d.resi || "-")} • ${escHtml(d.kurir || "-")}</div>
@@ -659,8 +666,6 @@
 
       // Kunci langsung agar kamera tidak bisa membaca barcode ke-2 kali sebelum klik OK!
       isScanPausedForOk = true;
-      totalScannedSession++;
-      document.getElementById("top-res-count").innerText = totalScannedSession + " Paket Terscan";
 
       const video = document.getElementById("top-live-video");
       if (video && !video.paused) {
@@ -669,7 +674,43 @@
       document.getElementById("top-cam-status-txt").innerText = "⏸️ Kamera Dijeda — Klik OK untuk Scan Berikutnya";
 
       const modeVal = document.getElementById("top-mode-scan") ? document.getElementById("top-mode-scan").value : "1X";
-      const existingOrd = topOrdersMap[code];
+      let existingOrd = topOrdersMap[code] || topOrdersMap["ORD-" + code];
+      if (!existingOrd) {
+        const matchKey = Object.keys(topOrdersMap).find(k => {
+          const item = topOrdersMap[k];
+          return item && (
+            String(item.r || "").toUpperCase() === code ||
+            String(item.oid || "").toUpperCase() === code ||
+            String(item.pkg || "").toUpperCase() === code
+          );
+        });
+        if (matchKey) existingOrd = topOrdersMap[matchKey];
+      }
+
+      const jamNow = new Date().toTimeString().substring(0, 8);
+
+      // 1. CEK APAKAH RESI ADA DI DAFTAR UPLOAD (TOLAK JIKA BELUM TERDAFTAR)
+      if (!existingOrd && topWajibResiTerdaftar !== false) {
+        playTopSound("ALARM");
+        const totalReg = Object.keys(topOrdersMap || {}).length;
+        const msgTolak = totalReg === 0
+          ? "Daftar resi di WMS masih kosong (0 resi)! Silakan upload/impor file Excel pesanan terlebih dahulu."
+          : "STOP! Barcode [" + code + "] TIDAK ADA di daftar pesanan yang di-upload (" + totalReg + " resi terdaftar)!";
+        const initTolak = {
+          tipe: "TAK_TERDAFTAR",
+          judul: "🚫 DITOLAK! RESI TIDAK TERDAFTAR!",
+          subjudul: msgTolak,
+          jam: jamNow,
+          resi: code,
+          kurir: "Tidak Terdaftar",
+          produk: "Tidak Ada di Daftar Upload"
+        };
+        updateAboveCameraBanner(initTolak);
+        showTopConfirmModal(initTolak);
+        sendToGasIframe({ type: "MNM_WMS_BARCODE_SCANNED", code: code });
+        return;
+      }
+
       let isInstantBatal = false;
       let isInstantGanda = false;
       let prevTimeInfo = "";
@@ -691,8 +732,6 @@
           prevTimeInfo = existingOrd.u || "sebelumnya";
         }
       }
-
-      const jamNow = new Date().toTimeString().substring(0, 8);
 
       if (isInstantBatal) {
         playTopSound("ALARM");
@@ -721,6 +760,8 @@
         updateAboveCameraBanner(initGanda);
         showTopConfirmModal(initGanda);
       } else {
+        totalScannedSession++;
+        document.getElementById("top-res-count").innerText = totalScannedSession + " Paket Terscan";
         playTopSound("SUCCESS");
         const initOk = {
           tipe: "SUKSES",
@@ -733,7 +774,8 @@
         };
         updateAboveCameraBanner(initOk);
         showTopConfirmModal(initOk);
-        topOrdersMap[code] = Object.assign({}, existingOrd || { r: code, pr: "Paket Reguler", qty: 1 }, {
+        const keySave = (existingOrd && existingOrd.r) ? existingOrd.r : code;
+        topOrdersMap[keySave] = Object.assign({}, existingOrd || { r: code, pr: "Paket Reguler", qty: 1 }, {
           st: modeVal === "2X_PACKING" ? "SUDAH_PACKING" : (modeVal === "RETUR" ? "RETUR" : "SELESAI_KIRIM"),
           u: jamNow
         });
@@ -758,14 +800,16 @@
       title.innerText = d.judul || "-";
       sub.innerText = d.subjudul || "-";
 
-      if (d.tipe === "GANDA" || d.tipe === "BATAL") {
+      if (d.tipe === "GANDA" || d.tipe === "BATAL" || d.tipe === "TAK_TERDAFTAR") {
         box.className = "w-full max-w-sm rounded-2xl p-3.5 sm:p-5 shadow-2xl border-4 border-amber-300 bg-rose-950 text-white text-center space-y-2.5";
         icon.className = "w-10 h-10 sm:w-12 sm:h-12 rounded-full mx-auto flex items-center justify-center text-xl sm:text-2xl bg-rose-500/30 text-amber-300 border border-amber-300";
         icon.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
         badge.className = "inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-300 text-rose-950";
-        badge.innerText = d.tipe === "BATAL" ? "⛔ PAKET DIBATALKAN" : "🚨 PAKET DOUBLE / RESI GANDA";
+        badge.innerText = d.tipe === "BATAL"
+          ? "⛔ PAKET DIBATALKAN"
+          : (d.tipe === "TAK_TERDAFTAR" ? "🚫 RESI TIDAK TERDAFTAR DI UPLOAD" : "🚨 PAKET DOUBLE / RESI GANDA");
         btnOk.className = "w-full py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-rose-950 font-black text-xs sm:text-sm shadow-lg transition";
-        btnOk.innerText = "OK, Mengerti & Pisahkan Paket!";
+        btnOk.innerText = "OK, Mengerti & Lanjut Scan!";
       } else if (d.tipe === "WARN") {
         box.className = "w-full max-w-sm rounded-2xl p-3.5 sm:p-5 shadow-2xl border-2 border-amber-400 bg-slate-900 text-white text-center space-y-2.5";
         icon.className = "w-10 h-10 sm:w-12 sm:h-12 rounded-full mx-auto flex items-center justify-center text-xl sm:text-2xl bg-amber-500/20 text-amber-300 border border-amber-400";
@@ -825,11 +869,11 @@
         badge.className = "px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-white text-emerald-900";
         badge.innerText = "✓ LOLOS SCAN • " + (d.jam || "");
         aim.className = "w-4/5 h-24 sm:h-28 border-4 border-emerald-400 rounded-2xl relative shadow-[0_0_35px_rgba(16,185,129,0.7)]";
-      } else if (d.tipe === "GANDA" || d.tipe === "BATAL") {
+      } else if (d.tipe === "GANDA" || d.tipe === "BATAL" || d.tipe === "TAK_TERDAFTAR") {
         playTopSound("ALARM");
         card.className = "p-3.5 bg-rose-600 text-white border-t-4 border-amber-300 transition-colors duration-150";
         badge.className = "px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-300 text-rose-950";
-        badge.innerText = (d.tipe === "BATAL" ? "⛔ PAKET BATAL" : "🚨 PAKET DOUBLE / RESI GANDA") + " • " + (d.jam || "");
+        badge.innerText = (d.tipe === "BATAL" ? "⛔ PAKET BATAL" : (d.tipe === "TAK_TERDAFTAR" ? "🚫 TAK TERDAFTAR" : "🚨 PAKET DOUBLE / RESI GANDA")) + " • " + (d.jam || "");
         aim.className = "w-4/5 h-24 sm:h-28 border-4 border-rose-500 rounded-2xl relative shadow-[0_0_35px_rgba(244,63,94,0.8)]";
       } else {
         playTopSound("ALARM");
