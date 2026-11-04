@@ -1,13 +1,10 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#1d4ed8">
   <title>UD. MNM GRUP</title>
-  <link rel="icon" href="https://iili.io/ClnHTdP.md.png" />
   <link rel="icon" href="https://iili.io/ClnHTdP.md.png" type="image/png">
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
@@ -19,24 +16,14 @@
       padding: 0;
       width: 100%;
       height: 100%;
-      background-color: #eee;
-    }
-
-    .iframe-container {
-      width: 100%;
-      height: 100dvh;
       overflow: hidden;
       background-color: #0f172a;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
-
-    iframe {
-      display: block;
     #gas-iframe {
       position: fixed;
       inset: 0;
       width: 100%;
-      height: 100dvh;
       height: 100%;
       border: none;
       background: #f8fafc;
@@ -45,11 +32,464 @@
   </style>
 </head>
 <body>
-  <div class="iframe-container">
-    <iframe
-      id="app"
-      src="https://script.google.com/macros/s/AKfycbyPrxdkV2tUh33FbhXD1SEm4PTslJFrpDgdO8rqZra9SW-3fYSL7x7D96X-AZcQjLTp/exec"
-      scrolling="yes"
-      allow="camera *; microphone *; geolocation *; fullscreen *; clipboard-read *; clipboard-write *"
-      style="position:fixed; top:0; left:0; width:100%; height:100%; border:none; margin:0; padding:0; overflow:hidden;">
-    </iframe>
+
+  <!-- =========================================================================
+       PETUNJUK DEPLOY VERCEL:
+       Ganti isi variabel GAS_EXEC_URL di bawah dengan URL Web App (/exec)
+       Google Apps Script Anda, lalu simpan file ini sebagai `index.html` di Vercel.
+       ========================================================================= -->
+
+  <!-- Iframe Utama Aplikasi Google Apps Script -->
+  <iframe
+    id="gas-iframe"
+    src="about:blank"
+    allow="camera *; microphone *; geolocation *; fullscreen *; clipboard-read *; clipboard-write *"
+    allowfullscreen>
+  </iframe>
+
+  <!-- Floating Button Cepat Buka Kamera Live (Selalu Tersedia di Pojok Kanan Bawah Saat Diperlukan) -->
+  <button
+    type="button"
+    id="fab-live-cam"
+    onclick="openTopLiveScanner()"
+    class="fixed bottom-4 right-4 z-30 bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2.5 rounded-full shadow-xl border-2 border-white/30 text-xs font-extrabold flex items-center gap-2 transition">
+    <i class="fa-solid fa-barcode text-sm"></i>
+    <span>Kamera Live WMS</span>
+  </button>
+
+  <!-- Setup URL Modal (Hanya muncul jika GAS_EXEC_URL belum diisi di kode) -->
+  <div id="setup-url-modal" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+      <div class="flex items-center gap-3">
+        <img src="https://iili.io/ClnHTdP.md.png" alt="Logo" class="w-10 h-10 rounded-full object-contain border border-blue-200">
+        <div>
+          <h2 class="text-base font-extrabold text-slate-900">Hubungkan URL Google Apps Script</h2>
+          <p class="text-xs text-slate-500">Tempel URL Web App (<code>.../exec</code>) Anda di bawah ini</p>
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">URL Web App Google Apps Script (berakhiran <code>/exec</code>)</label>
+        <input type="url" id="inp-gas-url" placeholder="https://script.google.com/macros/s/.../exec" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600">
+      </div>
+      <p class="text-[11px] text-slate-500 leading-relaxed">
+        Tips: Agar permanen untuk semua pengguna, isi langsung variabel <code>GAS_EXEC_URL</code> di baris 195 pada file <code>index.html</code> Vercel ini.
+      </p>
+      <button type="button" onclick="saveGasUrlFromInput()" class="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold shadow-md transition">
+        Simpan &amp; Buka Aplikasi
+      </button>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL KAMERA LIVE TOP-LEVEL VERCEL (100% BEBAS BLOKIR IFRAME GOOGLE!)
+       Karena kamera ini berjalan langsung di halaman utama Vercel (window.top),
+       browser HP mengizinkan Live Camera (getUserMedia) sepenuhnya tanpa hambatan.
+       ========================================================================= -->
+  <div id="top-live-camera-modal" class="hidden fixed inset-0 z-40 bg-slate-950/85 backdrop-blur-xs flex flex-col justify-between p-3 sm:p-5 overflow-y-auto">
+    <div class="max-w-lg w-full mx-auto bg-slate-900 text-white rounded-2xl border border-slate-700 shadow-2xl overflow-hidden my-auto">
+      <!-- Top Bar -->
+      <div class="px-4 py-3 bg-gradient-to-r from-blue-950 to-slate-900 border-b border-slate-800 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+          <div>
+            <h3 class="text-xs sm:text-sm font-extrabold">Kamera Live WMS — UD. MNM GRUP</h3>
+            <p id="top-cam-status-txt" class="text-[10px] text-blue-200">Kamera Live Top-Level Aktif (60fps Tanpa Jeda)</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <button type="button" id="top-btn-torch" onclick="toggleTopTorch()" class="hidden px-2.5 py-1.5 rounded-lg bg-amber-400 text-slate-950 text-[11px] font-extrabold">
+            <i class="fa-solid fa-bolt"></i> Senter
+          </button>
+          <button type="button" onclick="switchTopCameraFacing()" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 text-[11px] font-bold">
+            <i class="fa-solid fa-camera-rotate"></i> Putar
+          </button>
+          <button type="button" onclick="closeTopLiveScanner()" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-extrabold">
+            <i class="fa-solid fa-xmark mr-1"></i>Tutup
+          </button>
+        </div>
+      </div>
+
+      <!-- Mode & Lens Selector Bar -->
+      <div class="px-4 py-2.5 bg-slate-800/80 border-b border-slate-700/80 grid grid-cols-2 gap-2 text-xs">
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 mb-0.5">Alur Scan Gudang</label>
+          <select id="top-mode-scan" onchange="syncModeToIframe()" class="w-full bg-slate-900 text-white border border-slate-600 rounded-lg px-2 py-1.5 text-[11px] font-bold">
+            <option value="1X">⚡ 1 Kali Scan (Langsung)</option>
+            <option value="2X_PACKING">📦 2x Scan: Tahap 1 Packing</option>
+            <option value="2X_KURIR">🚚 2x Scan: Tahap 2 Kurir</option>
+            <option value="RETUR">↩️ Scan Retur / RTS</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 mb-0.5">Pilih Lensa Kamera HP</label>
+          <select id="top-lens-select" onchange="changeTopCameraLens(this.value)" class="w-full bg-slate-900 text-white border border-slate-600 rounded-lg px-2 py-1.5 text-[11px] font-bold">
+            <option value="environment">📷 Kamera Belakang Utama</option>
+            <option value="user">🤳 Kamera Depan</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Live Video Viewport -->
+      <div class="relative w-full aspect-[4/3] bg-black flex items-center justify-center overflow-hidden">
+        <video id="top-live-video" playsinline autoplay muted class="w-full h-full object-cover"></video>
+        <!-- Laser Target Box -->
+        <div class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <div id="top-aim-box" class="w-4/5 h-28 border-2 border-emerald-400 rounded-2xl relative shadow-[0_0_30px_rgba(16,185,129,0.35)] transition-colors duration-150">
+            <div class="absolute inset-x-3 top-1/2 h-0.5 bg-rose-500 shadow-[0_0_10px_#f43f5e] animate-pulse"></div>
+          </div>
+          <span class="mt-2 px-3 py-0.5 rounded-full bg-black/75 text-emerald-300 text-[10px] font-bold tracking-wide">
+            Arahkan Barcode Resi ke Dalam Kotak
+          </span>
+        </div>
+      </div>
+
+      <!-- Instant Result Banner inside Live Camera Modal -->
+      <div id="top-scan-result-card" class="p-4 bg-slate-800 border-t border-slate-700 transition-colors duration-150">
+        <div class="flex items-center justify-between gap-2">
+          <span id="top-res-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-slate-700 text-slate-300">
+            MENUNGGU BARCODE RESI
+          </span>
+          <span id="top-res-count" class="text-[11px] font-bold text-emerald-400">0 Paket Terscan</span>
+        </div>
+        <div id="top-res-title" class="text-base sm:text-lg font-black text-white mt-1">
+          Dekatkan Barcode Resi ke Kamera
+        </div>
+        <div id="top-res-sub" class="text-xs text-slate-300 mt-0.5">
+          Deteksi Resi Ganda &amp; Paket Batal aktif secara otomatis.
+        </div>
+        <div id="top-res-meta" class="hidden mt-2.5 pt-2.5 border-t border-white/15 grid grid-cols-2 gap-2 text-[11px]">
+          <div><span class="opacity-70 block text-[9px] uppercase font-bold">No. Resi</span><b id="top-res-resi" class="font-mono">-</b></div>
+          <div><span class="opacity-70 block text-[9px] uppercase font-bold">Toko &amp; Kurir</span><b id="top-res-kurir">-</b></div>
+          <div class="col-span-2"><span class="opacity-70 block text-[9px] uppercase font-bold">Isi Produk / SKU</span><b id="top-res-produk">-</b></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="hidden-qr-canvas" class="hidden"></div>
+
+  <script>
+    // =========================================================================
+    // 1. MASUKKAN URL WEB APP GOOGLE APPS SCRIPT (/exec) ANDA DI BARIS INI:
+    // =========================================================================
+    const GAS_EXEC_URL = "https://script.google.com/macros/s/AKfycbyPrxdkV2tUh33FbhXD1SEm4PTslJFrpDgdO8rqZra9SW-3fYSL7x7D96X-AZcQjLTp/exec";
+
+    const STORAGE_URL_KEY = "UD_MNM_VERCEL_GAS_URL_V1";
+    let activeStream = null;
+    let scanTimer = null;
+    let isScanning = false;
+    let currentFacing = "environment";
+    let currentDeviceId = "";
+    let torchEnabled = false;
+    let lastCode = "";
+    let lastCodeTime = 0;
+    let totalScannedSession = 0;
+    let html5FileScanner = null;
+
+    function getEffectiveGasUrl() {
+      if (GAS_EXEC_URL && GAS_EXEC_URL.indexOf("https://script.google.com/") === 0) {
+        return GAS_EXEC_URL;
+      }
+      try {
+        const saved = localStorage.getItem(STORAGE_URL_KEY);
+        if (saved && saved.indexOf("https://script.google.com/") === 0) return saved;
+      } catch (e) {}
+      return "";
+    }
+
+    function saveGasUrlFromInput() {
+      const inp = document.getElementById("inp-gas-url");
+      const val = (inp ? inp.value : "").trim();
+      if (val.indexOf("https://script.google.com/") !== 0) {
+        inp.style.borderColor = "#ef4444";
+        return;
+      }
+      try { localStorage.setItem(STORAGE_URL_KEY, val); } catch (e) {}
+      document.getElementById("setup-url-modal").classList.add("hidden");
+      document.getElementById("gas-iframe").src = val;
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      const url = getEffectiveGasUrl();
+      if (url) {
+        document.getElementById("gas-iframe").src = url;
+      } else {
+        document.getElementById("setup-url-modal").classList.remove("hidden");
+      }
+    });
+
+    // =========================================================================
+    // 2. KOMUNIKASI DUA ARAH DENGAN IFRAME APPS SCRIPT (POSTMESSAGE BRIDGE)
+    // =========================================================================
+    window.addEventListener("message", (ev) => {
+      const d = ev && ev.data;
+      if (!d || typeof d !== "object") return;
+
+      if (d.type === "MNM_WMS_START_TOP_CAMERA") {
+        // Beritahu iframe bahwa jembatan kamera top-level Vercel siap & langsung buka kamera live!
+        sendToGasIframe({ type: "MNM_WMS_TOP_CAMERA_READY" });
+        if (d.facingMode) currentFacing = d.facingMode;
+        const selMode = document.getElementById("top-mode-scan");
+        if (selMode && d.modeScan) {
+          selMode.value = d.modeScan === "2X" ? ("2X_" + (d.tahap2X || "PACKING")) : d.modeScan;
+        }
+        openTopLiveScanner();
+      } else if (d.type === "MNM_WMS_SCAN_FEEDBACK") {
+        renderTopScanFeedback(d);
+      }
+    });
+
+    function sendToGasIframe(payload) {
+      const ifr = document.getElementById("gas-iframe");
+      if (ifr && ifr.contentWindow) {
+        ifr.contentWindow.postMessage(payload, "*");
+      }
+    }
+
+    function syncModeToIframe() {
+      const val = document.getElementById("top-mode-scan").value;
+      if (val === "2X_PACKING") {
+        sendToGasIframe({ type: "MNM_WMS_CHANGE_MODE", modeScan: "2X" });
+        sendToGasIframe({ type: "MNM_WMS_CHANGE_TAHAP2X", tahap2X: "PACKING" });
+      } else if (val === "2X_KURIR") {
+        sendToGasIframe({ type: "MNM_WMS_CHANGE_MODE", modeScan: "2X" });
+        sendToGasIframe({ type: "MNM_WMS_CHANGE_TAHAP2X", tahap2X: "KURIR" });
+      } else {
+        sendToGasIframe({ type: "MNM_WMS_CHANGE_MODE", modeScan: val });
+      }
+    }
+
+    // =========================================================================
+    // 3. KAMERA LIVE TOP-LEVEL (BERJALAN DI DOMAIN VERCEL -> TIDAK TERBLOKIR)
+    // =========================================================================
+    async function populateTopCameraLenses() {
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const cams = devices.filter(d => d.kind === "videoinput");
+        const sel = document.getElementById("top-lens-select");
+        if (!sel || !cams.length) return;
+        let opts = '<option value="environment">📷 Kamera Belakang Utama</option><option value="user">🤳 Kamera Depan</option>';
+        cams.forEach((c, i) => {
+          if (c.deviceId) {
+            opts += `<option value="dev:${c.deviceId}">🔍 ${c.label || ("Lensa #" + (i + 1))}</option>`;
+          }
+        });
+        sel.innerHTML = opts;
+        if (currentDeviceId) sel.value = "dev:" + currentDeviceId;
+        else sel.value = currentFacing;
+      } catch (e) {}
+    }
+
+    async function openTopLiveScanner() {
+      const modal = document.getElementById("top-live-camera-modal");
+      modal.classList.remove("hidden");
+      sendToGasIframe({ type: "MNM_WMS_TOP_CAMERA_READY" });
+      await startTopVideoStream();
+    }
+
+    async function startTopVideoStream() {
+      stopTopVideoStream();
+      const statusTxt = document.getElementById("top-cam-status-txt");
+      statusTxt.innerText = "Menyalakan kamera live...";
+
+      const constraintsList = [];
+      if (currentDeviceId) {
+        constraintsList.push({ video: { deviceId: { exact: currentDeviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+        constraintsList.push({ video: { deviceId: { exact: currentDeviceId } }, audio: false });
+      }
+      constraintsList.push({ video: { facingMode: { ideal: currentFacing }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+      constraintsList.push({ video: { facingMode: currentFacing }, audio: false });
+      constraintsList.push({ video: true, audio: false });
+
+      let stream = null;
+      let lastErr = null;
+      for (let i = 0; i < constraintsList.length; i++) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraintsList[i]);
+          if (stream) break;
+        } catch (err) {
+          lastErr = err;
+        }
+      }
+
+      if (!stream) {
+        statusTxt.innerText = "Gagal membuka kamera: Pastikan izin kamera browser diizinkan (" + (lastErr ? lastErr.name : "Blocked") + ")";
+        return;
+      }
+
+      activeStream = stream;
+      isScanning = true;
+      const video = document.getElementById("top-live-video");
+      video.srcObject = stream;
+      await video.play();
+      populateTopCameraLenses();
+
+      // Cek fitur senter (Torch)
+      const track = stream.getVideoTracks()[0];
+      const btnTorch = document.getElementById("top-btn-torch");
+      if (track && track.getCapabilities) {
+        try {
+          const caps = track.getCapabilities();
+          btnTorch.classList.toggle("hidden", !(caps && caps.torch));
+        } catch (e) {}
+      }
+
+      // Siapkan detektor barcode
+      let nativeDetector = null;
+      if ("BarcodeDetector" in window) {
+        try {
+          const sup = await window.BarcodeDetector.getSupportedFormats();
+          if (sup && sup.length) {
+            nativeDetector = new window.BarcodeDetector({
+              formats: ["code_128", "code_39", "ean_13", "ean_8", "qr_code", "itf", "codabar"].filter(f => sup.includes(f))
+            });
+          }
+        } catch (e) { nativeDetector = null; }
+      }
+
+      statusTxt.innerText = nativeDetector
+        ? "⚡ Kamera Live Aktif (Akselerasi Hardware 25fps)"
+        : "📷 Kamera Live Aktif — Arahkan Barcode ke Kotak";
+
+      const offCanvas = document.createElement("canvas");
+      const offCtx = offCanvas.getContext("2d", { willReadFrequently: true });
+
+      const scanLoop = async () => {
+        if (!isScanning || !video || video.readyState < 2) return;
+        let hit = false;
+
+        if (nativeDetector) {
+          try {
+            const res = await nativeDetector.detect(video);
+            if (res && res.length > 0 && res[0].rawValue) {
+              hit = true;
+              onTopBarcodeDetected(res[0].rawValue);
+            }
+          } catch (e) { nativeDetector = null; }
+        }
+
+        if (!hit && isScanning && typeof Html5Qrcode !== "undefined") {
+          try {
+            const vw = video.videoWidth || 640;
+            const vh = video.videoHeight || 480;
+            const cw = Math.round(vw * 0.85);
+            const ch = Math.round(vh * 0.45);
+            const sx = Math.round((vw - cw) / 2);
+            const sy = Math.round((vh - ch) / 2);
+            offCanvas.width = cw;
+            offCanvas.height = ch;
+            offCtx.drawImage(video, sx, sy, cw, ch, 0, 0, cw, ch);
+
+            await new Promise(resolve => {
+              offCanvas.toBlob(async blob => {
+                if (!blob) { resolve(); return; }
+                try {
+                  if (!html5FileScanner) html5FileScanner = new Html5Qrcode("hidden-qr-canvas");
+                  const f = new File([blob], "f.jpg", { type: "image/jpeg" });
+                  const txt = await html5FileScanner.scanFile(f, false);
+                  if (txt) onTopBarcodeDetected(txt);
+                } catch (e2) {}
+                resolve();
+              }, "image/jpeg", 0.85);
+            });
+          } catch (e3) {}
+        }
+
+        if (isScanning) {
+          scanTimer = setTimeout(scanLoop, nativeDetector ? 45 : 210);
+        }
+      };
+
+      scanLoop();
+    }
+
+    function onTopBarcodeDetected(rawCode) {
+      const code = String(rawCode || "").trim().toUpperCase().replace(/[^A-Z0-9\-_]/g, "");
+      if (!code || code.length < 4) return;
+      const now = Date.now();
+      if (code === lastCode && (now - lastCodeTime) < 1400) return;
+      lastCode = code;
+      lastCodeTime = now;
+      totalScannedSession++;
+      document.getElementById("top-res-count").innerText = totalScannedSession + " Paket Terscan";
+
+      // Kirim instan ke aplikasi WMS di dalam iframe
+      sendToGasIframe({ type: "MNM_WMS_BARCODE_SCANNED", code: code });
+    }
+
+    function renderTopScanFeedback(d) {
+      const card = document.getElementById("top-scan-result-card");
+      const badge = document.getElementById("top-res-badge");
+      const title = document.getElementById("top-res-title");
+      const sub = document.getElementById("top-res-sub");
+      const meta = document.getElementById("top-res-meta");
+      const aim = document.getElementById("top-aim-box");
+
+      if (d.tipe === "SUKSES") {
+        card.className = "p-4 bg-emerald-600 text-white border-t border-emerald-400 transition-colors duration-150";
+        badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-white text-emerald-900";
+        badge.innerText = "✓ LOLOS SCAN • " + (d.jam || "");
+        aim.className = "w-4/5 h-28 border-4 border-emerald-400 rounded-2xl relative shadow-[0_0_35px_rgba(16,185,129,0.7)]";
+      } else if (d.tipe === "GANDA" || d.tipe === "BATAL") {
+        card.className = "p-4 bg-rose-600 text-white border-t-4 border-amber-300 transition-colors duration-150";
+        badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-300 text-rose-950";
+        badge.innerText = (d.tipe === "BATAL" ? "⛔ PAKET BATAL" : "🚨 RESI GANDA") + " • " + (d.jam || "");
+        aim.className = "w-4/5 h-28 border-4 border-rose-500 rounded-2xl relative shadow-[0_0_35px_rgba(244,63,94,0.8)]";
+      } else {
+        card.className = "p-4 bg-amber-500 text-slate-950 border-t border-amber-300 transition-colors duration-150";
+        badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-slate-900 text-amber-300";
+        badge.innerText = "⚠️ PERHATIAN • " + (d.jam || "");
+      }
+
+      title.innerText = d.judul || "-";
+      sub.innerText = d.subjudul || "-";
+      meta.classList.remove("hidden");
+      document.getElementById("top-res-resi").innerText = d.resi || "-";
+      document.getElementById("top-res-kurir").innerText = d.kurir || "-";
+      document.getElementById("top-res-produk").innerText = d.produk || "-";
+    }
+
+    function stopTopVideoStream() {
+      isScanning = false;
+      if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
+      if (activeStream) {
+        try { activeStream.getTracks().forEach(t => t.stop()); } catch (e) {}
+        activeStream = null;
+      }
+      const video = document.getElementById("top-live-video");
+      if (video) video.srcObject = null;
+    }
+
+    function closeTopLiveScanner() {
+      stopTopVideoStream();
+      document.getElementById("top-live-camera-modal").classList.add("hidden");
+    }
+
+    function switchTopCameraFacing() {
+      currentDeviceId = "";
+      currentFacing = (currentFacing === "environment") ? "user" : "environment";
+      startTopVideoStream();
+    }
+
+    function changeTopCameraLens(val) {
+      if (val && val.indexOf("dev:") === 0) {
+        currentDeviceId = val.substring(4);
+      } else {
+        currentDeviceId = "";
+        currentFacing = val || "environment";
+      }
+      startTopVideoStream();
+    }
+
+    async function toggleTopTorch() {
+      if (!activeStream) return;
+      try {
+        const track = activeStream.getVideoTracks()[0];
+        torchEnabled = !torchEnabled;
+        await track.applyConstraints({ advanced: [{ torch: torchEnabled }] });
+      } catch (e) {}
+    }
+  </script>
+</body>
+</html>
