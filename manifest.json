@@ -1,0 +1,26 @@
+{
+  "name": "UD. MNM GRUP - Sistem Manajemen Internal",
+  "short_name": "UD. MNM GRUP",
+  "description": "Aplikasi Manajemen Operasional, Absensi, Keuangan, dan WMS Gudang UD. MNM GRUP",
+  "lang": "id-ID",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#1d4ed8",
+  "icons": [
+    {
+      "src": "https://iili.io/ClnHTdP.md.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://iili.io/ClnHTdP.md.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
