@@ -4,8 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#1d4ed8">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="UD. MNM GRUP">
   <title>UD. MNM GRUP</title>
   <link rel="icon" href="https://iili.io/ClnHTdP.md.png" type="image/png">
+  <link rel="apple-touch-icon" href="https://iili.io/ClnHTdP.md.png">
+  <link rel="manifest" href="/manifest.json">
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.2/umd/index.min.js"></script>
@@ -17,6 +23,7 @@
       padding: 0;
       width: 100%;
       height: 100%;
+      height: 100dvh;
       overflow: hidden;
       background-color: #0f172a;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -26,6 +33,7 @@
       inset: 0;
       width: 100%;
       height: 100%;
+      height: 100dvh;
       border: none;
       background: #f8fafc;
       z-index: 10;
@@ -38,7 +46,7 @@
   <iframe
     id="gas-iframe"
     src="about:blank"
-    allow="camera *; microphone *; geolocation *; fullscreen *; clipboard-read *; clipboard-write *"
+    allow="camera *; microphone *; geolocation *; fullscreen *; clipboard-read *; clipboard-write *; autoplay *"
     allowfullscreen>
   </iframe>
 
@@ -188,9 +196,9 @@
 
   <script>
     // =========================================================================
-    // 1. MASUKKAN URL WEB APP GOOGLE APPS SCRIPT (/exec) ANDA DI BARIS INI:
+    // 1. URL WEB APP GOOGLE APPS SCRIPT (/exec) ANDA:
     // =========================================================================
-    const GAS_EXEC_URL = "https://script.google.com/macros/s/AKfycbyoMkjGGB7EUoxPePfz2sK7dKCVXedDjzE5yxyKa3oFytg6HDqBVPxf4LwgmDgMUeSP/exec";
+    const GAS_EXEC_URL = "https://script.google.com/macros/s/AKfycbxJolntXCShguXlqEIVA9jP4w_KDlIok3R-hSc6bdmo4aXC6SPvPRo1BVwSKv3ZJS2x/exec";
 
     const STORAGE_URL_KEY = "UD_MNM_VERCEL_GAS_URL_V1";
     let activeStream = null;
@@ -208,6 +216,135 @@
     let zxingTopReader = null;
     let topOrdersMap = {};
     let topWajibResiTerdaftar = true;
+    let _swReg = null;
+    let _deferredPwaPrompt = null;
+
+    // =========================================================================
+    // 1B. REGISTRASI SERVICE WORKER PWA & NOTIFIKASI SISTEM HP (METODE 3 VERCEL)
+    // =========================================================================
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/service-worker.js", { scope: "/" })
+          .then((reg) => {
+            _swReg = reg;
+          })
+          .catch((err) => {
+            console.warn("SW gagal didaftarkan:", err);
+          });
+      });
+
+      // Terima pesan dari Service Worker ketika user mengetuk banner notifikasi di layar atas HP
+      navigator.serviceWorker.addEventListener("message", (event) => {
+        const d = event && event.data;
+        if (d && d.type === "MNM_SW_NOTIFICATION_CLICKED") {
+          sendToGasIframe({ type: "MNM_OPEN_NOTIF_MODAL" });
+        }
+      });
+    }
+
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      _deferredPwaPrompt = e;
+    });
+
+    function playNotificationChimeTop() {
+      try {
+        unlockTopAudioSync();
+        if (!topAudioCtx) return;
+        [880, 1174.66].forEach((freq, idx) => {
+          const osc = topAudioCtx.createOscillator();
+          const gain = topAudioCtx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq, topAudioCtx.currentTime + idx * 0.14);
+          gain.gain.setValueAtTime(0.22, topAudioCtx.currentTime + idx * 0.14);
+          gain.gain.exponentialRampToValueAtTime(0.001, topAudioCtx.currentTime + idx * 0.14 + 0.28);
+          osc.connect(gain);
+          gain.connect(topAudioCtx.destination);
+          osc.start(topAudioCtx.currentTime + idx * 0.14);
+          osc.stop(topAudioCtx.currentTime + idx * 0.14 + 0.29);
+        });
+      } catch (e) {}
+    }
+
+    function triggerNativePwaNotification(item) {
+      playNotificationChimeTop();
+      try {
+        if (navigator.vibrate) navigator.vibrate([180, 80, 220]);
+      } catch (eV) {}
+
+      if (!("Notification" in window) || Notification.permission !== "granted") return;
+
+      const title = "🔔 " + String((item && item.modul) || "UD. MNM GRUP") + " • " + String((item && item.aksi) || "Aktivitas Baru");
+      const body = String((item && item.nama) || "User") + ": " + String((item && item.pesan) || "Ada aktivitas baru di aplikasi.");
+      const tag = String((item && item.id) || ("mnm-pwa-" + Date.now()));
+
+      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: "SHOW_MNM_NOTIFICATION",
+          payload: { title: title, body: body, tag: tag }
+        });
+      } else if (_swReg && typeof _swReg.showNotification === "function") {
+        _swReg.showNotification(title, {
+          body: body,
+          icon: "https://iili.io/ClnHTdP.md.png",
+          badge: "https://iili.io/ClnHTdP.md.png",
+          tag: tag,
+          renotify: true,
+          vibrate: [180, 80, 220]
+        });
+      } else {
+        try {
+          const n = new Notification(title, {
+            body: body,
+            icon: "https://iili.io/ClnHTdP.md.png",
+            badge: "https://iili.io/ClnHTdP.md.png",
+            tag: tag
+          });
+          n.onclick = () => {
+            try {
+              window.focus();
+              sendToGasIframe({ type: "MNM_OPEN_NOTIF_MODAL" });
+              n.close();
+            } catch (eC) {}
+          };
+        } catch (eN) {}
+      }
+    }
+
+    function requestTopNotificationPermission() {
+      if (!("Notification" in window)) {
+        playNotificationChimeTop();
+        return;
+      }
+      Notification.requestPermission().then((perm) => {
+        sendToGasIframe({ type: "MNM_NOTIF_PERM_RESULT", permission: perm });
+        if (perm === "granted") {
+          triggerNativePwaNotification({
+            id: "WELCOME-" + Date.now(),
+            modul: "UD. MNM GRUP",
+            aksi: "Notifikasi HP Aktif",
+            nama: "Sistem PWA Vercel",
+            pesan: "Pop-up banner layar atas, suara denting, dan getar HP telah aktif!"
+          });
+        }
+      });
+    }
+
+    // Voice Over Bahasa Indonesia untuk Kamera Top-Level ("Batal", "Ganda", "Tidak terdaftar")
+    function speakIndoAlertTop(text) {
+      try {
+        if (!("speechSynthesis" in window)) return;
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = "id-ID";
+        u.rate = 1.05;
+        u.pitch = 1.0;
+        const voices = window.speechSynthesis.getVoices() || [];
+        const idVoice = voices.find(v => /id[-_]ID|indones/i.test(v.lang || v.name));
+        if (idVoice) u.voice = idVoice;
+        window.speechSynthesis.speak(u);
+      } catch (e) {}
+    }
 
     function escHtml(s) {
       return String(s === null || s === undefined ? "" : s)
@@ -318,6 +455,7 @@
 
     // =========================================================================
     // 2. JEMBATAN DUA ARAH LANGSUNG KE USERHTMLFRAME GOOGLE APPS SCRIPT
+    //    (Kamera Live WMS + Notifikasi Sistem HP PWA Vercel)
     // =========================================================================
     window.addEventListener("message", (ev) => {
       const d = ev && ev.data;
@@ -336,6 +474,17 @@
 
       if (d.type === "MNM_BRIDGE_HANDSHAKE") {
         sendToGasIframe({ type: "MNM_WMS_TOP_CAMERA_READY" });
+        if ("Notification" in window && Notification.permission === "granted") {
+          sendToGasIframe({ type: "MNM_NOTIF_PERM_RESULT", permission: "granted" });
+        }
+      } else if (d.type === "MNM_PUSH_NOTIF" && d.item) {
+        // Notifikasi baru dari aplikasi -> tampilkan pop-up status bar HP via Service Worker Vercel
+        triggerNativePwaNotification(d.item);
+      } else if (d.type === "MNM_REQ_NOTIF_PERM") {
+        // User menekan tombol "Aktifkan Notif HP" di dalam modal lonceng
+        requestTopNotificationPermission();
+      } else if (d.type === "MNM_REQ_PWA_INSTALL" && _deferredPwaPrompt) {
+        _deferredPwaPrompt.prompt();
       } else if (d.type === "MNM_WMS_SYNC_ORDERS_MAP") {
         if (d.ordersMap) topOrdersMap = d.ordersMap;
       } else if (d.type === "MNM_ACTIVE_PAGE") {
@@ -692,6 +841,7 @@
       // 1. CEK APAKAH RESI ADA DI DAFTAR UPLOAD (TOLAK JIKA BELUM TERDAFTAR)
       if (!existingOrd && topWajibResiTerdaftar !== false) {
         playTopSound("ALARM");
+        speakIndoAlertTop("Tidak terdaftar");
         const totalReg = Object.keys(topOrdersMap || {}).length;
         const msgTolak = totalReg === 0
           ? "Daftar resi di WMS masih kosong (0 resi)! Silakan upload/impor file Excel pesanan terlebih dahulu."
@@ -735,6 +885,7 @@
 
       if (isInstantBatal) {
         playTopSound("ALARM");
+        speakIndoAlertTop("Batal");
         const initBatal = {
           tipe: "BATAL",
           judul: "⛔ STOP! PAKET DIBATALKAN PEMBELI!",
@@ -748,6 +899,7 @@
         showTopConfirmModal(initBatal);
       } else if (isInstantGanda) {
         playTopSound("ALARM");
+        speakIndoAlertTop("Ganda");
         const initGanda = {
           tipe: "GANDA",
           judul: "🚨 STOP! PAKET DOUBLE / RESI GANDA!",
