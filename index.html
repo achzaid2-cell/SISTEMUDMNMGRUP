@@ -198,7 +198,7 @@
     // =========================================================================
     // 1. URL WEB APP GOOGLE APPS SCRIPT (/exec) ANDA:
     // =========================================================================
-    const GAS_EXEC_URL = "https://script.google.com/macros/s/AKfycbyrmW2RUb2ETEaTePxzNZfMX8jpZanS5CdIOoSNtQXkA1Rm5iN083o2VQLoh61To9Hs/exec";
+    const GAS_EXEC_URL = "https://script.google.com/macros/s/AKfycbw3vR9kA2vlHdTCYBZVoqgN21U43Mb5ADjKJ6_4JqNsbALw26Pa1_d0GiNSbUFXv2s/exec";
 
     const STORAGE_URL_KEY = "UD_MNM_VERCEL_GAS_URL_V1";
     let activeStream = null;
@@ -502,10 +502,21 @@
         openTopLiveScanner();
       } else if (d.type === "MNM_WMS_SCAN_FEEDBACK") {
         renderTopScanFeedback(d);
+      } else if (d.type === "MNM_HISTORY_PUSH" || d.type === "MNM_ACTIVE_PAGE") {
+        pushTopBackGuard(d.page || "app");
+        if (d.type === "MNM_ACTIVE_PAGE") {
+          const isWms = d.page === "wms-gudang";
+          if (!isWms) {
+            fabBtn.classList.add("hidden");
+            if (isCamOpen) stopTopLevelCamera(true);
+          }
+        }
       } else if (d.type === "MNM_BT_CONNECT_REQ") {
-        connectTopBluetoothPrinter(null);
+        sendToGasIframe({ type: "MNM_BT_BRIDGE_ACK" });
+        connectTopBluetoothPrinter(null, "", !!d.forceNew);
       } else if (d.type === "MNM_BT_PRINT_ESCPOS" && d.base64) {
-        connectTopBluetoothPrinter(d.base64);
+        sendToGasIframe({ type: "MNM_BT_BRIDGE_ACK" });
+        handleTopBluetoothPrintJob(d.base64, d.text || "", d.noNota || "");
       } else if (d.type === "MNM_WMS_CONFIRM_OK_FROM_GAS") {
         confirmTopScanAndResume(true);
       }
@@ -1084,70 +1095,253 @@
 
     let _topBtDevice = null;
     let _topBtChar = null;
-    async function connectTopBluetoothPrinter(base64EscPos) {
+    let _PendingBtJob = null;
+    const TOP_BT_UUIDS = [
+      "000018f0-0000-1000-8000-00805f9b34fb",
+      "e7810a71-73ae-499d-8c15-faa9aef0c3f2",
+      "49535343-fe7d-4ae5-8fa9-9fafd205e455",
+      "0000ff00-0000-1000-8000-00805f9b34fb",
+      "0000ffe0-0000-1000-8000-00805f9b34fb"
+    ];
+
+    // --- MULTI-LEVEL HARDWARE BACK BUTTON (POPSTATE) GUARD ---
+    let _topHistoryReady = false;
+    function pushTopBackGuard(pageLabel) {
       try {
-        if (!navigator.bluetooth) {
-          sendToGasIframe({ type: "MNM_BT_ERROR", message: "Browser ini belum mendukung Web Bluetooth langsung. Gunakan Chrome di Android/PC atau tombol App Thermal (RawBT)." });
-          return;
-        }
-        if (!_topBtDevice || !_topBtDevice.gatt || !_topBtDevice.gatt.connected || !_topBtChar) {
-          const dev = await navigator.bluetooth.requestDevice({
-            acceptAllDevices: true,
-            optionalServices: [
-              "000018f0-0000-1000-8000-00805f9b34fb",
-              "e7810a71-73ae-499d-8c15-faa9aef0c3f2",
-              "49535343-fe7d-4ae5-8fa9-9fafd205e455",
-              "0000ff00-0000-1000-8000-00805f9b34fb",
-              "0000ffe0-0000-1000-8000-00805f9b34fb"
-            ]
-          });
-          _topBtDevice = dev;
-          const srv = await dev.gatt.connect();
-          const uuids = [
-            "000018f0-0000-1000-8000-00805f9b34fb",
-            "e7810a71-73ae-499d-8c15-faa9aef0c3f2",
-            "49535343-fe7d-4ae5-8fa9-9fafd205e455",
-            "0000ff00-0000-1000-8000-00805f9b34fb",
-            "0000ffe0-0000-1000-8000-00805f9b34fb"
-          ];
-          _topBtChar = null;
-          for (const u of uuids) {
-            try {
-              const s = await srv.getPrimaryService(u);
-              const cs = await s.getCharacteristics();
-              for (const c of cs) {
-                if (c.properties.write || c.properties.writeWithoutResponse) { _topBtChar = c; break; }
-              }
-              if (_topBtChar) break;
-            } catch (e) {}
+        history.pushState({ mnmTopGuard: true, page: pageLabel || "app", ts: Date.now() }, "", location.pathname + location.search);
+      } catch (e) {}
+    }
+    function initTopBackGuardOnce() {
+      if (_topHistoryReady) return;
+      _topHistoryReady = true;
+      pushTopBackGuard("root");
+      pushTopBackGuard("active");
+    }
+    window.addEventListener("pointerdown", initTopBackGuardOnce, { passive: true });
+    window.addEventListener("touchstart", initTopBackGuardOnce, { passive: true });
+    window.addEventListener("load", () => { setTimeout(initTopBackGuardOnce, 300); });
+
+    window.addEventListener("popstate", (ev) => {
+      const btModal = document.getElementById("top-bt-studio-modal");
+      if (btModal && !btModal.classList.contains("hidden")) {
+        closeTopBtStudioModal();
+        pushTopBackGuard("bt-closed");
+        return;
+      }
+      if (typeof isCamOpen !== "undefined" && isCamOpen) {
+        stopTopLevelCamera(true);
+        pushTopBackGuard("cam-closed");
+        return;
+      }
+      sendToGasIframe({ type: "MNM_BACK_BUTTON_PRESSED" });
+      pushTopBackGuard("step-back");
+    });
+
+    async function findTopWritableChar(srv) {
+      for (const u of TOP_BT_UUIDS) {
+        try {
+          const s = await srv.getPrimaryService(u);
+          const cs = await s.getCharacteristics();
+          for (const c of cs) {
+            if (c.properties.write || c.properties.writeWithoutResponse) return c;
           }
-          if (!_topBtChar) {
-            const svcs = await srv.getPrimaryServices();
-            for (const s of svcs) {
-              try {
-                const cs = await s.getCharacteristics();
-                for (const c of cs) {
-                  if (c.properties.write || c.properties.writeWithoutResponse) { _topBtChar = c; break; }
-                }
-                if (_topBtChar) break;
-              } catch (e) {}
+        } catch (e) {}
+      }
+      const svcs = await srv.getPrimaryServices();
+      for (const s of svcs) {
+        try {
+          const cs = await s.getCharacteristics();
+          for (const c of cs) {
+            if (c.properties.write || c.properties.writeWithoutResponse) return c;
+          }
+        } catch (e) {}
+      }
+      return null;
+    }
+
+    async function trySilentReconnectTopBt() {
+      try {
+        if (_topBtDevice && _topBtDevice.gatt) {
+          if (!_topBtDevice.gatt.connected || !_topBtChar) {
+            const srv = await _topBtDevice.gatt.connect();
+            _topBtChar = await findTopWritableChar(srv);
+          }
+          if (_topBtChar) return true;
+        }
+        if (navigator.bluetooth && typeof navigator.bluetooth.getDevices === "function") {
+          const devs = await navigator.bluetooth.getDevices();
+          if (devs && devs.length > 0) {
+            const savedId = localStorage.getItem("MNM_BT_PRINTER_ID") || "";
+            const savedNm = localStorage.getItem("MNM_BT_PRINTER_NAME") || "";
+            const dev = devs.find(x => (savedId && x.id === savedId) || (savedNm && x.name === savedNm)) || devs[0];
+            if (dev && dev.gatt) {
+              _topBtDevice = dev;
+              dev.addEventListener("gattserverdisconnected", () => { _topBtChar = null; });
+              const srv = await dev.gatt.connect();
+              _topBtChar = await findTopWritableChar(srv);
+              if (_topBtChar) {
+                sendToGasIframe({ type: "MNM_BT_CONNECTED", name: dev.name || "Thermal Printer" });
+                return true;
+              }
             }
           }
+        }
+      } catch (e) {}
+      return false;
+    }
+
+    async function writeEscPosBase64ToTopBt(base64EscPos) {
+      if (!_topBtChar || !base64EscPos) return false;
+      const bin = atob(base64EscPos);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const chunk = 100;
+      for (let i = 0; i < bytes.length; i += chunk) {
+        const slice = bytes.slice(i, i + chunk);
+        if (_topBtChar.properties.writeWithoutResponse) await _topBtChar.writeValueWithoutResponse(slice);
+        else await _topBtChar.writeValue(slice);
+        await new Promise(r => setTimeout(r, 18));
+      }
+      return true;
+    }
+
+    function ensureTopBtStudioModal() {
+      let el = document.getElementById("top-bt-studio-modal");
+      if (el) return el;
+      el = document.createElement("div");
+      el.id = "top-bt-studio-modal";
+      el.className = "hidden";
+      el.style.cssText = "position:fixed;inset:0;z-index:99999;background:#0f172a;color:#f8fafc;display:flex;flex-direction:column;justify-content:space-between;padding:16px;font-family:system-ui,-apple-system,sans-serif;box-sizing:border-box;overflow-y:auto;";
+      el.innerHTML = `
+        <div style="width:100%;max-width:600px;margin:0 auto;display:flex;flex-direction:column;min-height:calc(100dvh - 32px);justify-content:space-between;gap:12px;">
+          <div>
+            <div style="display:flex;align-items:center;justify-content:space-between;background:#1e293b;border:1px solid #334155;padding:12px 16px;border-radius:16px;">
+              <div style="font-size:16px;font-weight:800;display:flex;align-items:center;gap:8px;">🖨️ <span>Pratinjau Cetak Thermal</span></div>
+              <button type="button" onclick="closeTopBtStudioModal()" style="background:#334155;color:#fff;border:none;padding:8px 14px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;">⬅️ Kembali</button>
+            </div>
+            <div id="top-bt-st" style="margin-top:10px;padding:12px 14px;border-radius:14px;background:#1e3a8a;border:1px solid #3b82f6;color:#dbeafe;font-size:13px;font-weight:700;text-align:center;">
+              Pilih Printer Bluetooth sekali saja — pencetakan nota berikutnya akan langsung otomatis!
+            </div>
+          </div>
+          <div style="flex:1;display:flex;align-items:center;justify-content:center;width:100%;">
+            <div style="width:100%;background:#fff;color:#0f172a;border-radius:18px;padding:18px 16px;box-shadow:0 20px 40px rgba(0,0,0,0.45);border-top:6px dashed #cbd5e1;border-bottom:6px dashed #cbd5e1;">
+              <pre id="top-bt-pre" style="margin:0;width:100%;font-family:'Courier New',Courier,monospace;font-size:clamp(13px,3.8vw,17px);line-height:1.45;font-weight:700;white-space:pre-wrap;word-break:break-word;color:#000;"></pre>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <button type="button" onclick="triggerTopBtPairAndPrint(false)" style="width:100%;padding:15px 16px;border-radius:14px;border:none;font-weight:800;font-size:15px;cursor:pointer;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;box-shadow:0 4px 14px rgba(0,0,0,0.3);">
+              🔵 <span id="top-bt-btn-lbl">Pilih Printer Bluetooth & Cetak Sekarang</span>
+            </button>
+            <a id="top-bt-rawbt" href="#" style="display:flex;align-items:center;justify-content:center;width:100%;padding:14px 16px;border-radius:14px;font-weight:800;font-size:14px;text-decoration:none;background:linear-gradient(135deg,#059669,#047857);color:#fff;box-sizing:border-box;">
+              📱 Cetak Instan via App RawBT Android
+            </a>
+            <button type="button" onclick="triggerTopBtPairAndPrint(true)" style="width:100%;padding:11px;border-radius:12px;border:1px solid #475569;background:#1e293b;color:#cbd5e1;font-weight:700;font-size:12px;cursor:pointer;">
+              🔄 Ganti / Pilih Ulang Perangkat Printer Bluetooth
+            </button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(el);
+      return el;
+    }
+
+    function openTopBtStudioModal(base64EscPos, textPreview) {
+      _PendingBtJob = { base64: base64EscPos, text: textPreview };
+      const el = ensureTopBtStudioModal();
+      const pre = document.getElementById("top-bt-pre");
+      if (pre) pre.textContent = textPreview || "Siap menghubungkan Printer Thermal Bluetooth...";
+      const rawLnk = document.getElementById("top-bt-rawbt");
+      if (rawLnk) {
+        if (base64EscPos) {
+          rawLnk.href = "rawbt:base64," + base64EscPos;
+          rawLnk.style.display = "flex";
+        } else {
+          rawLnk.style.display = "none";
+        }
+      }
+      const savedNm = localStorage.getItem("MNM_BT_PRINTER_NAME") || "";
+      const btnLbl = document.getElementById("top-bt-btn-lbl");
+      if (btnLbl) btnLbl.textContent = savedNm ? ("Cetak Sekarang ke " + savedNm) : "Pilih Printer Bluetooth & Cetak Sekarang";
+      el.classList.remove("hidden");
+      el.style.display = "flex";
+      pushTopBackGuard("bt-modal");
+    }
+
+    function closeTopBtStudioModal() {
+      const el = document.getElementById("top-bt-studio-modal");
+      if (el) {
+        el.classList.add("hidden");
+        el.style.display = "none";
+      }
+    }
+
+    async function handleTopBluetoothPrintJob(base64EscPos, textPreview, noNota) {
+      // 1. Try silent auto-reconnect to already paired/connected printer first!
+      const autoOk = await trySilentReconnectTopBt();
+      if (autoOk && _topBtChar) {
+        try {
+          await writeEscPosBase64ToTopBt(base64EscPos);
+          sendToGasIframe({ type: "MNM_BT_PRINT_OK", name: (_topBtDevice && _topBtDevice.name) || "Thermal Printer" });
+          return;
+        } catch (e) {
+          _topBtChar = null;
+        }
+      }
+      // 2. If not yet paired in this browser session, show Full-Screen Top-Level Print Studio
+      openTopBtStudioModal(base64EscPos, textPreview);
+    }
+
+    async function triggerTopBtPairAndPrint(forceNew) {
+      const st = document.getElementById("top-bt-st");
+      try {
+        if (!forceNew && await trySilentReconnectTopBt() && _topBtChar) {
+          if (_PendingBtJob && _PendingBtJob.base64) {
+            if (st) st.textContent = "🖨️ Mencetak struk ke " + (_topBtDevice.name || "Printer") + "...";
+            await writeEscPosBase64ToTopBt(_PendingBtJob.base64);
+            sendToGasIframe({ type: "MNM_BT_PRINT_OK", name: _topBtDevice.name || "Thermal Printer" });
+            closeTopBtStudioModal();
+            return;
+          }
+        }
+        if (st) {
+          st.style.background = "#1e3a8a";
+          st.textContent = "🔍 Pilih perangkat Printer Bluetooth Anda...";
+        }
+        await connectTopBluetoothPrinter(_PendingBtJob ? _PendingBtJob.base64 : null, _PendingBtJob ? _PendingBtJob.text : "", true);
+        closeTopBtStudioModal();
+      } catch (e) {
+        if (st) {
+          st.style.background = "#881337";
+          st.textContent = "⚠️ " + (e && e.message ? e.message : e);
+        }
+      }
+    }
+
+    async function connectTopBluetoothPrinter(base64EscPos, textPreview, forceNew) {
+      try {
+        if (!navigator.bluetooth) {
+          openTopBtStudioModal(base64EscPos, textPreview);
+          return;
+        }
+        if (forceNew || !await trySilentReconnectTopBt()) {
+          const dev = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: TOP_BT_UUIDS
+          });
+          _topBtDevice = dev;
+          try {
+            localStorage.setItem("MNM_BT_PRINTER_ID", dev.id || "");
+            localStorage.setItem("MNM_BT_PRINTER_NAME", dev.name || "Thermal Printer");
+          } catch (e) {}
+          dev.addEventListener("gattserverdisconnected", () => { _topBtChar = null; });
+          const srv = await dev.gatt.connect();
+          _topBtChar = await findTopWritableChar(srv);
           if (!_topBtChar) throw new Error("Karakteristik tulis BLE tidak ditemukan pada printer ini.");
           sendToGasIframe({ type: "MNM_BT_CONNECTED", name: dev.name || "Thermal Printer" });
         }
         if (base64EscPos && _topBtChar) {
-          const bin = atob(base64EscPos);
-          const bytes = new Uint8Array(bin.length);
-          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-          const chunk = 100;
-          for (let i = 0; i < bytes.length; i += chunk) {
-            const slice = bytes.slice(i, i + chunk);
-            if (_topBtChar.properties.writeWithoutResponse) await _topBtChar.writeValueWithoutResponse(slice);
-            else await _topBtChar.writeValue(slice);
-            await new Promise(r => setTimeout(r, 20));
-          }
-          sendToGasIframe({ type: "MNM_BT_PRINT_OK" });
+          await writeEscPosBase64ToTopBt(base64EscPos);
+          sendToGasIframe({ type: "MNM_BT_PRINT_OK", name: (_topBtDevice && _topBtDevice.name) || "Thermal Printer" });
         }
       } catch (err) {
         const msg = String(err && err.message ? err.message : err);
