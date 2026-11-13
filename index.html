@@ -198,7 +198,7 @@
     // =========================================================================
     // 1. URL WEB APP GOOGLE APPS SCRIPT (/exec) ANDA:
     // =========================================================================
-    const GAS_EXEC_URL = "https://script.google.com/macros/s/AKfycbw3vR9kA2vlHdTCYBZVoqgN21U43Mb5ADjKJ6_4JqNsbALw26Pa1_d0GiNSbUFXv2s/exec";
+    const GAS_EXEC_URL = "https://script.google.com/macros/s/AKfycbz-PkH6rXOhjhIkiSKWotsSglXhN1rHSqPOQY8o6dEnSoqSBz20cYVgbWNkZBMrHOwV/exec";
 
     const STORAGE_URL_KEY = "UD_MNM_VERCEL_GAS_URL_V1";
     let activeStream = null;
@@ -503,7 +503,7 @@
       } else if (d.type === "MNM_WMS_SCAN_FEEDBACK") {
         renderTopScanFeedback(d);
       } else if (d.type === "MNM_HISTORY_PUSH" || d.type === "MNM_ACTIVE_PAGE") {
-        pushTopBackGuard(d.page || "app");
+        if (d.type === "MNM_HISTORY_PUSH") pushTopBackGuard(d.page || "app");
         if (d.type === "MNM_ACTIVE_PAGE") {
           const isWms = d.page === "wms-gudang";
           if (!isWms) {
@@ -1106,22 +1106,27 @@
 
     // --- MULTI-LEVEL HARDWARE BACK BUTTON (POPSTATE) GUARD ---
     let _topHistoryReady = false;
+    let _lastTopPushTs = 0;
     function pushTopBackGuard(pageLabel) {
+      _lastTopPushTs = Date.now();
       try {
-        history.pushState({ mnmTopGuard: true, page: pageLabel || "app", ts: Date.now() }, "", location.pathname + location.search);
+        if (!history.state || !history.state.mnmSentinel) {
+          history.replaceState({ mnmSentinel: "ROOT", ts: _lastTopPushTs }, "");
+        }
+        if (!history.state || history.state.mnmSentinel !== "PAGE") {
+          history.pushState({ mnmSentinel: "PAGE", page: pageLabel || "app", ts: _lastTopPushTs }, "");
+        }
       } catch (e) {}
     }
     function initTopBackGuardOnce() {
       if (_topHistoryReady) return;
       _topHistoryReady = true;
       pushTopBackGuard("root");
-      pushTopBackGuard("active");
     }
-    window.addEventListener("pointerdown", initTopBackGuardOnce, { passive: true });
-    window.addEventListener("touchstart", initTopBackGuardOnce, { passive: true });
-    window.addEventListener("load", () => { setTimeout(initTopBackGuardOnce, 300); });
+    window.addEventListener("load", () => { setTimeout(initTopBackGuardOnce, 500); });
 
     window.addEventListener("popstate", (ev) => {
+      if (Date.now() - _lastTopPushTs < 900) return;
       const btModal = document.getElementById("top-bt-studio-modal");
       if (btModal && !btModal.classList.contains("hidden")) {
         closeTopBtStudioModal();
@@ -1134,7 +1139,7 @@
         return;
       }
       sendToGasIframe({ type: "MNM_BACK_BUTTON_PRESSED" });
-      pushTopBackGuard("step-back");
+      setTimeout(() => { pushTopBackGuard("step-back"); }, 250);
     });
 
     async function findTopWritableChar(srv) {
