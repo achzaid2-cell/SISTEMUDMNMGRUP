@@ -46,7 +46,7 @@
   <iframe
     id="gas-iframe"
     src="about:blank"
-    allow="camera *; microphone *; geolocation *; fullscreen *; clipboard-read *; clipboard-write *; autoplay *"
+    allow="bluetooth *; serial *; usb *; camera *; microphone *; geolocation *; fullscreen *; clipboard-read *; clipboard-write *; autoplay *"
     allowfullscreen>
   </iframe>
 
@@ -198,7 +198,7 @@
     // =========================================================================
     // 1. URL WEB APP GOOGLE APPS SCRIPT (/exec) ANDA:
     // =========================================================================
-    const GAS_EXEC_URL = "https://script.google.com/macros/s/AKfycbzXPQVMyt_Fkyv6a41eLbpmrIo-KHXZkd08juaTjWQfoszIbEbWCOQXgNnLWgW7hvM5/exec";
+    const GAS_EXEC_URL = "https://script.google.com/macros/s/AKfycbyrmW2RUb2ETEaTePxzNZfMX8jpZanS5CdIOoSNtQXkA1Rm5iN083o2VQLoh61To9Hs/exec";
 
     const STORAGE_URL_KEY = "UD_MNM_VERCEL_GAS_URL_V1";
     let activeStream = null;
@@ -502,6 +502,10 @@
         openTopLiveScanner();
       } else if (d.type === "MNM_WMS_SCAN_FEEDBACK") {
         renderTopScanFeedback(d);
+      } else if (d.type === "MNM_BT_CONNECT_REQ") {
+        connectTopBluetoothPrinter(null);
+      } else if (d.type === "MNM_BT_PRINT_ESCPOS" && d.base64) {
+        connectTopBluetoothPrinter(d.base64);
       } else if (d.type === "MNM_WMS_CONFIRM_OK_FROM_GAS") {
         confirmTopScanAndResume(true);
       }
@@ -1075,6 +1079,82 @@
         currentFacing = val || "environment";
       }
       startTopVideoStream();
+    }
+
+
+    let _topBtDevice = null;
+    let _topBtChar = null;
+    async function connectTopBluetoothPrinter(base64EscPos) {
+      try {
+        if (!navigator.bluetooth) {
+          sendToGasIframe({ type: "MNM_BT_ERROR", message: "Browser ini belum mendukung Web Bluetooth langsung. Gunakan Chrome di Android/PC atau tombol App Thermal (RawBT)." });
+          return;
+        }
+        if (!_topBtDevice || !_topBtDevice.gatt || !_topBtDevice.gatt.connected || !_topBtChar) {
+          const dev = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: [
+              "000018f0-0000-1000-8000-00805f9b34fb",
+              "e7810a71-73ae-499d-8c15-faa9aef0c3f2",
+              "49535343-fe7d-4ae5-8fa9-9fafd205e455",
+              "0000ff00-0000-1000-8000-00805f9b34fb",
+              "0000ffe0-0000-1000-8000-00805f9b34fb"
+            ]
+          });
+          _topBtDevice = dev;
+          const srv = await dev.gatt.connect();
+          const uuids = [
+            "000018f0-0000-1000-8000-00805f9b34fb",
+            "e7810a71-73ae-499d-8c15-faa9aef0c3f2",
+            "49535343-fe7d-4ae5-8fa9-9fafd205e455",
+            "0000ff00-0000-1000-8000-00805f9b34fb",
+            "0000ffe0-0000-1000-8000-00805f9b34fb"
+          ];
+          _topBtChar = null;
+          for (const u of uuids) {
+            try {
+              const s = await srv.getPrimaryService(u);
+              const cs = await s.getCharacteristics();
+              for (const c of cs) {
+                if (c.properties.write || c.properties.writeWithoutResponse) { _topBtChar = c; break; }
+              }
+              if (_topBtChar) break;
+            } catch (e) {}
+          }
+          if (!_topBtChar) {
+            const svcs = await srv.getPrimaryServices();
+            for (const s of svcs) {
+              try {
+                const cs = await s.getCharacteristics();
+                for (const c of cs) {
+                  if (c.properties.write || c.properties.writeWithoutResponse) { _topBtChar = c; break; }
+                }
+                if (_topBtChar) break;
+              } catch (e) {}
+            }
+          }
+          if (!_topBtChar) throw new Error("Karakteristik tulis BLE tidak ditemukan pada printer ini.");
+          sendToGasIframe({ type: "MNM_BT_CONNECTED", name: dev.name || "Thermal Printer" });
+        }
+        if (base64EscPos && _topBtChar) {
+          const bin = atob(base64EscPos);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          const chunk = 100;
+          for (let i = 0; i < bytes.length; i += chunk) {
+            const slice = bytes.slice(i, i + chunk);
+            if (_topBtChar.properties.writeWithoutResponse) await _topBtChar.writeValueWithoutResponse(slice);
+            else await _topBtChar.writeValue(slice);
+            await new Promise(r => setTimeout(r, 20));
+          }
+          sendToGasIframe({ type: "MNM_BT_PRINT_OK" });
+        }
+      } catch (err) {
+        const msg = String(err && err.message ? err.message : err);
+        if (!/cancelled|chosen/i.test(msg)) {
+          sendToGasIframe({ type: "MNM_BT_ERROR", message: msg });
+        }
+      }
     }
 
     async function toggleTopTorch() {
