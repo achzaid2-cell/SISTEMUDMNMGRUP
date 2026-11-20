@@ -40,6 +40,26 @@
     }
   </style>
 </head>
+  (function () {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const shopId = params.get('shop_id');
+    if (code && shopId) {
+      const sendToFrame = () => {
+        const iframe = document.querySelector('iframe');
+        if (iframe && iframe.contentWindow) {
+          iframe.contentWindow.postMessage(
+            { type: 'SHOPEE_OAUTH_CALLBACK', code: code, shop_id: shopId },
+            '*'
+          );
+        }
+      };
+      window.addEventListener('load', () => setTimeout(sendToFrame, 1200));
+      setTimeout(sendToFrame, 2000);
+      // Bersihkan query parameter di address bar agar rapi
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  })();
 <body>
 
   <!-- Iframe Utama Aplikasi Google Apps Script (Tanpa Tombol Melayang yang Mengganggu Menu Lain) -->
@@ -198,7 +218,7 @@
     // =========================================================================
     // 1. URL WEB APP GOOGLE APPS SCRIPT (/exec) ANDA:
     // =========================================================================
-    const GAS_EXEC_URL = "https://script.google.com/macros/s/AKfycbzL2JE5nIcaJwCVB37-diJQBF6UunCK7c3S2WmanvrJ-Eawo5effc0WqNNAsV7ZbyMN/exec";
+    const GAS_EXEC_URL = "https://script.google.com/macros/s/AKfycbyp4yYaFTTPhzdyTl_qOlPQiejDjmQi3rcYlEy0cHXskIViOWrJVGTL_ISjH9H054UV/exec";
 
     const STORAGE_URL_KEY = "UD_MNM_VERCEL_GAS_URL_V1";
     let activeStream = null;
