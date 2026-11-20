@@ -40,26 +40,25 @@
     }
   </style>
 </head>
+<script>
   (function () {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
     const shopId = params.get('shop_id');
-    if (code && shopId) {
+    if (code) {
+      const msg = shopId
+        ? { type: 'SHOPEE_OAUTH_CALLBACK', code: code, shop_id: shopId }
+        : { type: 'TIKTOK_OAUTH_CALLBACK', code: code };
       const sendToFrame = () => {
         const iframe = document.querySelector('iframe');
-        if (iframe && iframe.contentWindow) {
-          iframe.contentWindow.postMessage(
-            { type: 'SHOPEE_OAUTH_CALLBACK', code: code, shop_id: shopId },
-            '*'
-          );
-        }
+        if (iframe && iframe.contentWindow) iframe.contentWindow.postMessage(msg, '*');
       };
       window.addEventListener('load', () => setTimeout(sendToFrame, 1200));
       setTimeout(sendToFrame, 2000);
-      // Bersihkan query parameter di address bar agar rapi
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   })();
+</script>
 <body>
 
   <!-- Iframe Utama Aplikasi Google Apps Script (Tanpa Tombol Melayang yang Mengganggu Menu Lain) -->
